@@ -1,0 +1,140 @@
+#+TITLE: Gabumon Sticker Processing
+#+DATE: 2024-07-29
+#+SPDX_LICENSE: MIT
+
+* Load required libraries
+Import necessary libraries.
+#+begin_src python
+from PIL import Image, ImageDraw
+import numpy as np
+import sys
+import os
+#+end_src
+
+* Error handling for command line arguments
+Check if the source file name is provided as a command line argument.
+#+begin_src python
+if len(sys.argv) != 2:
+    print("Usage: python script_name.py <source_image_path>")
+    sys.exit(1)
+
+image_path = sys.argv[1]
+
+if not os.path.isfile(image_path):
+    print(f"Error: File '{image_path}' not found.")
+    sys.exit(1)
+#+end_src
+
+* Load the image
+Load the original image and convert it to RGBA format to ensure it has an alpha channel.
+#+begin_src python
+try:
+    image = Image.open(image_path).convert("RGBA")
+except Exception as e:
+    print(f"Error loading image: {e}")
+    sys.exit(1)
+#+end_src
+
+* Convert image to numpy array
+Convert the image to a numpy array for easier manipulation of pixel values.
+#+begin_src python
+data = np.array(image)
+#+end_src
+
+* Get image dimensions
+Get the dimensions of the image (height and width) for later use in processing.
+#+begin_src python
+height, width = data.shape[:2]
+#+end_src
+
+* Create a mask for the sky
+Initialize a mask for the sky pixels, which is initially set to all False.
+#+begin_src python
+sky_mask = np.zeros((height, width), dtype=bool)
+#+end_src
+
+* Define flood fill function
+Define a function to flood fill the sky starting from given x, y coordinates.
+#+begin_src python
+def flood_fill(x, y):
+    stack = [(x, y)]
+    while stack:
+        x, y = stack.pop()
+        if not (0 <= x < width and 0 <= y < height):
+            continue
+        if sky_mask[y, x]:
+            continue
+        if all(lower_threshold[:3] <= data[y, x, :3]) and all(data[y, x, :3] <= upper_threshold[:3]):
+            sky_mask[y, x] = True
+            stack.extend([(x+1, y), (x-1, y), (x, y+1), (x, y-1)])
+#+end_src
+
+* Define the color range for sky
+Define the color range that represents the sky (light blue tones).
+#+begin_src python
+lower_threshold = np.array([100, 150, 200, 255])
+upper_threshold = np.array([255, 255, 255, 255])
+#+end_src
+
+* Flood fill from the edges
+Flood fill from the left and right edges to identify all sky pixels connected to the edges.
+#+begin_src python
+for y in range(height):
+    flood_fill(0, y)
+    flood_fill(width-1, y)
+#+end_src
+
+* Apply the mask to make sky pixels transparent
+Apply the mask to set the identified sky pixels to transparent.
+#+begin_src python
+transparent_color = (255, 255, 255, 0)
+data[sky_mask] = transparent_color
+#+end_src
+
+* Convert back to image
+Convert the numpy array back to an image with RGBA format.
+#+begin_src python
+final_image = Image.fromarray(data, 'RGBA')
+#+end_src
+
+* Save the image with correct transparency
+Save the processed image with transparent background.
+#+begin_src python
+try:
+    final_output_path_floodfill = "sticker_with_correct_transparency_floodfill.png"
+    final_image.save(final_output_path_floodfill)
+except Exception as e:
+    print(f"Error saving image: {e}")
+    sys.exit(1)
+#+end_src
+
+* Auto-crop the image
+Define a function to auto-crop the image to only include the non-transparent content.
+#+begin_src python
+def auto_crop_image(image):
+    data = np.array(image)
+    non_transparent_mask = np.any(data[:, :, 3] != 0, axis=1)
+    non_transparent_columns = np.any(data[:, :, 3] != 0, axis=0)
+
+    top = np.argmax(non_transparent_mask)
+    bottom = len(non_transparent_mask) - np.argmax(non_transparent_mask[::-1])
+    left = np.argmax(non_transparent_columns)
+    right = len(non_transparent_columns) - np.argmax(non_transparent_columns[::-1])
+
+    cropped_image = image.crop((left, top, right, bottom))
+    return cropped_image
+#+end_src
+
+* Auto-crop the final image
+Load the final image, auto-crop it, and save the cropped image.
+#+begin_src python
+try:
+    final_image = Image.open(final_output_path_floodfill).convert("RGBA")
+    cropped_image = auto_crop_image(final_image)
+    final_cropped_output_path = "sticker_with_correct_transparency_floodfill_cropped.png"
+    cropped_image.save(final_cropped_output_path)
+except Exception as e:
+    print(f"Error processing final image: {e}")
+    sys.exit(1)
+#+end_src
+
