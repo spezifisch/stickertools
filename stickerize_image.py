@@ -1,3 +1,6 @@
+# Copyright 2024 spezifisch <spezifisch+git@gmail.com>
+# SPDX-License-Identifier: MIT
+
 from PIL import Image, ImageOps, ImageFilter
 import sys
 
