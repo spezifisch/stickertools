@@ -20,28 +20,19 @@ mask = expanded_image.split()[3]
 # Expand the mask to create the border effect
 expanded_mask = ImageOps.expand(mask, border=border_width, fill=255)
 
-# Ensure the expanded mask and expanded image sizes match
-assert (
-    expanded_mask.size == expanded_image.size
-), "Expanded mask size and expanded image size do not match"
+# Create the contour effect by expanding the mask
+contour_mask = expanded_mask
+contour_mask = Image.composite(mask, contour_mask, mask)
+contour_mask = ImageOps.expand(contour_mask, border=border_width, fill=255)
 
-# Create an image for the border with the same size as the expanded image
-border_size = expanded_image.size
-border = Image.new("RGBA", border_size, (255, 255, 255, 0))
-border.putalpha(expanded_mask)
+# Create an image for the border
+border = Image.new("RGBA", contour_mask.size, (255, 255, 255, 255))
+border.putalpha(contour_mask)
 
-# Ensure the border and expanded image sizes match
-assert (
-    border.size == expanded_image.size
-), "Border size and expanded image size do not match"
-
-# Composite the expanded image with the border
-final_border_image = Image.alpha_composite(border, expanded_image)
-
-# Ensure the final composite size matches
-assert (
-    final_border_image.size == expanded_image.size
-), "Final composite size and expanded image size do not match"
+# Create a new image to place the border and the original image
+final_border_image = Image.new("RGBA", border.size, (255, 255, 255, 0))
+final_border_image.paste(border, (-border_width, -border_width))
+final_border_image.paste(expanded_image, (0, 0), mask)
 
 # Crop the image to remove the additional border
 cropped_final_border_image = final_border_image.crop(
